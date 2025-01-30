@@ -20,7 +20,7 @@ function this.with_hidden_surface(settings, execute)
     local hidden_surface = this.create_hidden_surface(settings)
 
     -- Run the provided function within a protected call
-    local status, err = pcall(execute(hidden_surface))
+    local status, err = pcall(execute, hidden_surface)
 
     this.delete_hidden_surface()
 end
