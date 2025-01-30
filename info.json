@@ -1,0 +1,13 @@
+{
+    "name": "broom",
+    "version": "1.0.0",
+    "title": "Broom Tool",
+    "description": "A simple tool to sweep away unwanted elements from your Factorio world",
+    "author": "igoticecream",
+    "contact": "https://github.com/igoticecream/factorio-broom",
+    "homepage": "https://github.com/igoticecream/factorio-broom",
+    "factorio_version": "2.0",
+    "dependencies": [
+        "base >= 2.0.0"
+    ]
+}
