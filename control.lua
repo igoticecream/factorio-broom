@@ -12,4 +12,5 @@ handler.add_libraries({
     require("scripts.clean-trees"),
     require("scripts.clean-cliffs"),
     require("scripts.regenerate"),
+    require("scripts.gui"),
 })
