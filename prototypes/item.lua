@@ -18,7 +18,7 @@ data:extend({
             cursor_box_type = "not-allowed",
         },
         alt_select = {
-            border_color = { r = 0, g = 1, b = 0 },
+            border_color = { r = 1, g = 0, b = 0 },
             mode = { "nothing" },
             cursor_box_type = "not-allowed",
         },

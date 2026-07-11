@@ -1,32 +1,86 @@
--- Settings window for the broom tool. Checkboxes read/write the runtime-global
--- mod settings, so the window stays in sync with Factorio's mod settings menu.
+local player_settings = require("scripts.player-settings")
 
 local FRAME_NAME = "broom_settings_frame"
 local INNER_FRAME_NAME = "broom_inner_frame"
 local SCROLL_NAME = "broom_settings_scroll"
 local PIN_BUTTON_NAME = "broom_pin_button"
 local CLOSE_BUTTON_NAME = "broom_close_button"
+local RESET_BUTTON_NAME = "broom_reset_button"
 local CHECKBOX_PREFIX = "broom_gui_"
+local SECTION_HEADER_NAME = "broom_section_header"
+local SECTION_ARROW_NAME = "broom_section_arrow"
+local SECTION_OPTIONS_NAME = "broom_section_options"
+local LABEL_COLOR = { 200, 200, 200 }
 
-local OPTIONS = {
-    { setting = "broom-trees" },
-    { setting = "broom-rock" },
-    { setting = "broom-cliffs" },
-    { setting = "broom-resources" },
-    { setting = "broom-nuclear" },
-    { setting = "broom-biter-creep" },
-    { setting = "broom-decoratives" },
-    { setting = "broom-decoratives-only-artificial-tiles", indent = true },
-    { setting = "broom-corpses" },
-    { setting = "broom-corpses-exclude-biter",      indent = true },
-    { setting = "broom-corpses-exclude-scorchmark", indent = true },
-    { setting = "broom-corpses-exclude-stump",      indent = true },
-    { setting = "broom-corpses-exclude-remnants",   indent = true },
+-- Every category is a section. Single settings render directly as checkboxes;
+-- multi-option sections are collapsible and use an action string for radios.
+local SECTIONS = {
+    { caption = "gui.broom-trees",       tooltip = "gui.broom-trees-tooltip",       key = "trees" },
+    {
+        caption = "gui.broom-rocks",
+        tooltip = "gui.broom-rocks-tooltip",
+        enabled_key = "rocks",
+        options = {
+            { key = "rocks_action", value = "remove", indent = true, caption = "gui.broom-remove",    tooltip = "gui.broom-remove-rocks-tooltip" },
+            { key = "rocks_action", value = "heal",   indent = true, caption = "gui.broom-rock-heal", tooltip = "gui.broom-rock-heal-tooltip" },
+        },
+    },
+    {
+        caption = "gui.broom-decoratives",
+        tooltip = "gui.broom-decoratives-tooltip",
+        enabled_key = "decoratives",
+        options = {
+            { key = "decoratives_action", value = "remove",     indent = true, caption = "gui.broom-remove",            tooltip = "gui.broom-remove-decoratives-tooltip" },
+            { key = "decoratives_action", value = "artificial", indent = true, caption = "gui.broom-remove-artificial", tooltip = "gui.broom-remove-artificial-tooltip" },
+            { key = "decoratives_action", value = "regenerate", indent = true, caption = "gui.broom-regenerate",        tooltip = "gui.broom-regenerate-tooltip" },
+        },
+    },
+    { caption = "gui.broom-cliffs",      tooltip = "gui.broom-cliffs-tooltip",      key = "cliffs" },
+    { caption = "gui.broom-resources",   tooltip = "gui.broom-resources-tooltip",   key = "resources" },
+    { caption = "gui.broom-nuclear",     tooltip = "gui.broom-nuclear-tooltip",     key = "nuclear" },
+    { caption = "gui.broom-biter-creep", tooltip = "gui.broom-biter-creep-tooltip", key = "biter_creep" },
+    {
+        caption = "gui.broom-corpses",
+        tooltip = "gui.broom-corpses-tooltip",
+        enabled_key = "corpses",
+        options = {
+            { key = "corpses_exclude_biter",      indent = true, caption = "gui.broom-exclude-biter",      tooltip = "gui.broom-exclude-biter-tooltip" },
+            { key = "corpses_exclude_scorchmark", indent = true, caption = "gui.broom-exclude-scorchmark", tooltip = "gui.broom-exclude-scorchmark-tooltip" },
+            { key = "corpses_exclude_stump",      indent = true, caption = "gui.broom-exclude-stump",      tooltip = "gui.broom-exclude-stump-tooltip" },
+            { key = "corpses_exclude_remnants",   indent = true, caption = "gui.broom-exclude-remnants",   tooltip = "gui.broom-exclude-remnants-tooltip" },
+        },
+    },
 }
 
-local CHECKBOX_TO_SETTING = {}
-for _, option in ipairs(OPTIONS) do
-    CHECKBOX_TO_SETTING[CHECKBOX_PREFIX .. option.setting] = option.setting
+-- Expand the single-setting shorthand, derive each section's frame name from
+-- its settings key ("trees" -> "broom_trees_frame"), and build the lookups
+-- used by the event handlers.
+local CONTROL_BY_NAME = {}
+for _, section in ipairs(SECTIONS) do
+    section.name = "broom_" .. (section.key or section.enabled_key) .. "_frame"
+    section.options = section.options or { { key = section.key, caption = section.caption, tooltip = section.tooltip } }
+    if section.enabled_key then
+        local name = CHECKBOX_PREFIX .. section.enabled_key
+        CONTROL_BY_NAME[name] = { key = section.enabled_key }
+    end
+    for _, option in ipairs(section.options) do
+        option.name = CHECKBOX_PREFIX .. option.key .. (option.value and "_" .. option.value or "")
+        CONTROL_BY_NAME[option.name] = option
+    end
+end
+
+-- The frame location persists with the save, while this table resets on load.
+-- Multiplayer resets through on_player_joined_game to avoid desyncs.
+local session_position_reset = {}
+
+--- @param settings table
+--- @param control table
+--- @return boolean
+local function control_state(settings, control)
+    if control.value then
+        return settings[control.key] == control.value
+    end
+    return settings[control.key] == true
 end
 
 --- @param player_index uint
@@ -52,16 +106,88 @@ local function get_pin_button(frame)
     return frame.broom_titlebar[PIN_BUTTON_NAME]
 end
 
---- Update every checkbox from the current runtime-global settings
+--- Update every checkbox from the player's settings
 --- @param frame LuaGuiElement
-local function refresh(frame)
+--- @param settings table
+local function refresh(frame, settings)
     local scroll = frame[INNER_FRAME_NAME][SCROLL_NAME]
-    for _, option in ipairs(OPTIONS) do
-        local checkbox = scroll[CHECKBOX_PREFIX .. option.setting]
-        if checkbox and checkbox.valid then
-            checkbox.state = settings.global[option.setting].value --[[@as boolean]]
+    for _, section in ipairs(SECTIONS) do
+        local section_frame = scroll[section.name]
+        if section_frame and section_frame.valid then
+            if section.enabled_key then
+                local header = section_frame[SECTION_HEADER_NAME]
+                local checkbox = header and header[CHECKBOX_PREFIX .. section.enabled_key]
+                if checkbox and checkbox.valid then
+                    checkbox.state = settings[section.enabled_key]
+                end
+            end
+            local container = section.key and section_frame or section_frame[SECTION_OPTIONS_NAME]
+            for _, option in ipairs(section.options) do
+                local checkbox = container[option.name]
+                if checkbox and checkbox.valid then
+                    checkbox.state = control_state(settings, option)
+                end
+            end
         end
     end
+end
+
+--- Compose a section header arrow.
+--- @param expanded boolean
+--- @return string
+local function section_arrow(expanded)
+    return expanded and " ▾ " or " ▴ "
+end
+
+--- Add a dark section. Multi-option sections receive a clickable header and a
+--- collapsible options flow; single-option sections use the frame directly.
+--- @param scroll LuaGuiElement
+--- @param section_data table
+--- @return LuaGuiElement container The frame or collapsible options flow
+local function add_section(scroll, section_data)
+    local section = scroll.add {
+        type = "frame",
+        name = section_data.name,
+        direction = "vertical",
+        style = "deep_frame_in_shallow_frame_for_description",
+    }
+    section.style.horizontally_stretchable = true
+
+    if section_data.key then
+        return section
+    end
+
+    local header = section.add {
+        type = "flow",
+        name = SECTION_HEADER_NAME,
+        direction = "horizontal",
+    }
+    header.style.vertical_align = "center"
+    header.style.horizontally_stretchable = true
+
+    header.add {
+        type = "checkbox",
+        name = CHECKBOX_PREFIX .. section_data.enabled_key,
+        caption = { section_data.caption },
+        tooltip = { section_data.tooltip },
+        state = false,
+    }
+
+    local spacer = header.add { type = "empty-widget" }
+    spacer.style.horizontally_stretchable = true
+
+    local arrow = header.add {
+        type = "label",
+        name = SECTION_ARROW_NAME,
+        caption = section_arrow(false),
+        tooltip = { section_data.caption .. "-tooltip" },
+        style = "semibold_label",
+    }
+    arrow.style.font_color = LABEL_COLOR
+
+    local options = section.add { type = "flow", name = SECTION_OPTIONS_NAME, direction = "vertical", visible = false }
+    options.add { type = "line", direction = "horizontal", style = "tooltip_category_line" }
+    return options
 end
 
 --- Create the settings window (hidden state handled by callers)
@@ -126,38 +252,64 @@ local function build_frame(player)
         style = "inside_shallow_frame",
     }
 
-    local subheader = inner.add { type = "frame", style = "subheader_frame" }
+    -- Subheader
+    local subheader = inner.add { type = "frame", direction = "horizontal", style = "subheader_frame" }
+    subheader.style.use_header_filler = true
     subheader.style.horizontally_stretchable = true
-    subheader.add {
+    local label = subheader.add {
         type = "label",
-        caption = { "item-description.broom-selection-tool" },
+        caption = { "gui.broom-subheader" },
         style = "subheader_caption_label",
+    }
+    -- label.style.font_color = LABEL_COLOR
+    -- label.style.font = 'default-semibold'
+
+    local spacer = subheader.add { type = "empty-widget" }
+    spacer.style.horizontally_stretchable = true
+
+    subheader.add {
+        type = "sprite-button",
+        name = RESET_BUTTON_NAME,
+        sprite = "utility/reset",
+        style = "tool_button_red",
+        tooltip = { "gui.broom-reset-tooltip" },
     }
 
     local scroll = inner.add { type = "scroll-pane", name = SCROLL_NAME, direction = "vertical" }
     scroll.style.padding = 12
+    local settings = player_settings.get(player.index)
 
-    for _, option in ipairs(OPTIONS) do
-        local checkbox = scroll.add {
-            type = "checkbox",
-            name = CHECKBOX_PREFIX .. option.setting,
-            caption = { "mod-setting-name." .. option.setting },
-            tooltip = { "mod-setting-description." .. option.setting },
-            state = settings.global[option.setting].value --[[@as boolean]],
-        }
-        if option.indent then
-            checkbox.style.left_margin = 16
+    for _, section in ipairs(SECTIONS) do
+        local container = add_section(scroll, section)
+        for _, option in ipairs(section.options) do
+            local checkbox = container.add {
+                type = option.value and "radiobutton" or "checkbox",
+                name = option.name,
+                caption = { option.caption },
+                tooltip = { option.tooltip },
+                state = control_state(settings, option),
+            }
+            if option.indent then
+                checkbox.style.left_margin = 16
+            end
         end
     end
 
-    frame.auto_center = true
+    -- frame.auto_center = true
+    frame.location = { 0, 0 }
     return frame
 end
 
 --- @param player LuaPlayer
 local function show(player)
     local frame = build_frame(player)
-    refresh(frame)
+    -- Single-player only: loading a save does not fire on_player_joined_game,
+    -- so a frame restored from the save is reset here instead.
+    if not game.is_multiplayer() and not session_position_reset[player.index] then
+        session_position_reset[player.index] = true
+        frame.location = { 0, 0 }
+    end
+    refresh(frame, player_settings.get(player.index))
     frame.visible = true
     frame.bring_to_front()
     if not is_pinned(player.index) then
@@ -253,9 +405,21 @@ this.events = {
             return
         end
         if element.name == CLOSE_BUTTON_NAME then
-            hide(game.get_player(event.player_index))
+            local player = game.get_player(event.player_index)
+            if player then
+                hide(player)
+            end
+        elseif element.name == RESET_BUTTON_NAME then
+            local player = game.get_player(event.player_index)
+            local frame = player and get_frame(player)
+            if frame then
+                refresh(frame, player_settings.reset(event.player_index))
+            end
         elseif element.name == PIN_BUTTON_NAME then
             local player = game.get_player(event.player_index)
+            if not player then
+                return
+            end
             local frame = get_frame(player)
             storage.broom_gui = storage.broom_gui or { pin = {} }
             if element.toggled then
@@ -267,6 +431,16 @@ this.events = {
                 storage.broom_gui.pin[event.player_index] = nil
                 player.opened = frame
             end
+        elseif element.name == SECTION_ARROW_NAME then
+            -- The parent guards cover foreign elements whose names happen to
+            -- collide with ours; this handler fires for every mod's GUI clicks.
+            local header = element.parent -- arrow -> header -> section frame -> options flow
+            local section = header and header.parent
+            local options = section and section[SECTION_OPTIONS_NAME]
+            if options and options.valid then
+                options.visible = not options.visible
+                element.caption = section_arrow(options.visible)
+            end
         end
     end,
 
@@ -276,9 +450,19 @@ this.events = {
         if not (element and element.valid) then
             return
         end
-        local setting = CHECKBOX_TO_SETTING[element.name]
-        if setting then
-            settings.global[setting] = { value = element.state }
+        local control = CONTROL_BY_NAME[element.name]
+        if control then
+            if control.value and not element.state then
+                element.state = true
+                return
+            end
+            local settings = player_settings.get(event.player_index)
+            settings[control.key] = control.value or element.state
+            local player = game.get_player(event.player_index)
+            local frame = player and get_frame(player)
+            if frame then
+                refresh(frame, settings)
+            end
         end
     end,
 
@@ -293,19 +477,22 @@ this.events = {
         if is_pinned(event.player_index) then
             return
         end
-        hide(game.get_player(event.player_index))
+        local player = game.get_player(event.player_index)
+        if player then
+            hide(player)
+        end
     end,
 
-    --- @param event EventData.on_runtime_mod_setting_changed
-    [defines.events.on_runtime_mod_setting_changed] = function(event)
-        if event.setting_type ~= "runtime-global" then
+    --- Reset a (re)joining player's persisted window position synchronously.
+    --- @param event EventData.on_player_joined_game
+    [defines.events.on_player_joined_game] = function(event)
+        local player = game.get_player(event.player_index)
+        if not (player and player.valid) then
             return
         end
-        for _, player in pairs(game.players) do
-            local frame = get_frame(player)
-            if frame then
-                refresh(frame)
-            end
+        local frame = get_frame(player)
+        if frame then
+            frame.location = { 0, 0 }
         end
     end,
 

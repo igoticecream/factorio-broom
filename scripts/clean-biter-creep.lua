@@ -21,15 +21,11 @@ local function clean_biter_creep(surface, area)
     }
 end
 
-local this = {}
-
-this.events = {
-    --- @param event EventData.on_player_selected_area
-    [defines.events.on_player_selected_area] = function(event)
-        if event.item == "broom-selection-tool" and settings.global["broom-biter-creep"].value then
-            clean_biter_creep(event.surface, event.area)
-        end
-    end,
-}
-
-return this
+--- @param surface LuaSurface The selected surface
+--- @param area BoundingBox The selected area
+--- @param preferences table The initiating player's cleanup preferences
+return function(surface, area, preferences)
+    if preferences.biter_creep then
+        clean_biter_creep(surface, area)
+    end
+end

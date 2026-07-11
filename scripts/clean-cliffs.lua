@@ -13,15 +13,11 @@ local function clean_cliffs(surface, area)
     end
 end
 
-local this = {}
-
-this.events = {
-    --- @param event EventData.on_player_selected_area
-    [defines.events.on_player_selected_area] = function(event)
-        if event.item == "broom-selection-tool" and settings.global["broom-cliffs"].value then
-            clean_cliffs(event.surface, event.area)
-        end
-    end,
-}
-
-return this
+--- @param surface LuaSurface The selected surface
+--- @param area BoundingBox The selected area
+--- @param preferences table The initiating player's cleanup preferences
+return function(surface, area, preferences)
+    if preferences.cliffs then
+        clean_cliffs(surface, area)
+    end
+end

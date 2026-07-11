@@ -2,8 +2,15 @@
 Version: 1.1.0
 Date: 2026-07-11
   Features:
-    - Added a settings window that opens while holding the broom tool, with checkboxes for every removal option, kept in sync with the mod settings menu.
-    - The window closes when the tool leaves the cursor; a pin button keeps it open.
+    - Added an in-game settings window that opens with the broom tool, with collapsible options, pin and close controls, and a reset button.
+    - Added individual cleanup preferences for each player.
+    - Added an option to heal damaged rocks instead of removing them.
+    - Added options to remove all decoratives, remove them only from artificial tiles, or regenerate them.
+  Changes:
+    - Moved cleanup configuration from the map settings to the Broom settings window.
+    - Decorative regeneration now uses the normal broom selection instead of the alternate selection.
+    - The alternate selection (Shift + drag) now applies the same actions as the normal selection.
+    - Cleanup options must be selected again after upgrading because the previous map-wide settings are not migrated.
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.2
 Date: 2026-06-23

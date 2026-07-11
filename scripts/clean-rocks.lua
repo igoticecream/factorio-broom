@@ -23,15 +23,27 @@ local function clean_rocks(surface, area)
     end
 end
 
-local this = {}
-
-this.events = {
-    --- @param event EventData.on_player_selected_area
-    [defines.events.on_player_selected_area] = function(event)
-        if event.item == "broom-selection-tool" and settings.global["broom-rock"].value then
-            clean_rocks(event.surface, event.area)
+--- @param surface LuaSurface The surface on which rocks will be healed
+--- @param area BoundingBox The bounding box area where rocks will be healed
+local function heal_rocks(surface, area)
+    -- Restore rocks to full health so their health bar disappears
+    for _, entity in ipairs(surface.find_entities_filtered { area = area, name = target_entities }) do
+        if entity.valid and entity.health then
+            entity.health = entity.max_health
         end
-    end,
-}
+    end
+end
 
-return this
+--- @param surface LuaSurface The selected surface
+--- @param area BoundingBox The selected area
+--- @param preferences table The initiating player's cleanup preferences
+return function(surface, area, preferences)
+    if not preferences.rocks then
+        return
+    end
+    if preferences.rocks_action == "remove" then
+        clean_rocks(surface, area)
+    elseif preferences.rocks_action == "heal" then
+        heal_rocks(surface, area)
+    end
+end
