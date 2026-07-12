@@ -21,6 +21,8 @@ local function default_settings()
     for key, value in pairs(DEFAULTS) do
         settings[key] = value
     end
+    -- Table defaults must be created per player, never shared by reference
+    settings.resources_exclude = {}
     return settings
 end
 
@@ -60,6 +62,7 @@ this.on_configuration_changed = function()
                 player_settings[key] = value
             end
         end
+        player_settings.resources_exclude = player_settings.resources_exclude or {}
     end
 end
 

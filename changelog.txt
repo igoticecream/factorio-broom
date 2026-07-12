@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.1.2
+Date: 2026-07-12
+  Features:
+    - Added options to exclude individual resources from removal, listed by ores and liquids and covering modded resources automatically.
+---------------------------------------------------------------------------------------------------
 Version: 1.1.1
 Date: 2026-07-12
   Features:

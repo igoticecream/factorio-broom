@@ -12,6 +12,54 @@ local SECTION_ARROW_NAME = "broom_section_arrow"
 local SECTION_OPTIONS_NAME = "broom_section_options"
 local LABEL_COLOR = { 200, 200, 200 }
 
+--- @param prototype LuaEntityPrototype
+--- @return boolean
+local function is_fluid_resource(prototype)
+    local products = prototype.mineable_properties and prototype.mineable_properties.products
+    if products then
+        for _, product in ipairs(products) do
+            if product.type == "fluid" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- One exclusion checkbox per resource prototype, built from the game's
+-- prototypes so Space Age and modded resources are covered automatically.
+-- Solid resources (ores) are listed first, then fluids, each under a label.
+-- LuaCustomTable iterates in prototype-id order (registration order), which
+-- is the sorting kept here; it is identical for every client in multiplayer.
+local function resource_options()
+    local solids, fluids = {}, {}
+    for name, prototype in pairs(prototypes.get_entity_filtered { { filter = "type", type = "resource" } }) do
+        local group = is_fluid_resource(prototype) and fluids or solids
+        group[#group + 1] = name
+    end
+
+    local options = {}
+    local function add_group(label, names)
+        if #names == 0 then
+            return
+        end
+        options[#options + 1] = { label = label }
+        for _, name in ipairs(names) do
+            local localised_name = prototypes.entity[name].localised_name
+            options[#options + 1] = {
+                key = "resources_exclude",
+                exclude = name,
+                indent = true,
+                caption = { "gui.broom-exclude-resource", localised_name },
+                tooltip = { "gui.broom-exclude-resource-tooltip", localised_name },
+            }
+        end
+    end
+    add_group("gui.broom-resources-solids", solids)
+    add_group("gui.broom-resources-fluids", fluids)
+    return options
+end
+
 -- Every category is a section. Single settings render directly as checkboxes;
 -- multi-option sections are collapsible and use an action string for radios.
 local SECTIONS = {
@@ -45,7 +93,12 @@ local SECTIONS = {
         },
     },
     { caption = "gui.broom-cliffs",      tooltip = "gui.broom-cliffs-tooltip",      key = "cliffs" },
-    { caption = "gui.broom-resources",   tooltip = "gui.broom-resources-tooltip",   key = "resources" },
+    {
+        caption = "gui.broom-resources",
+        tooltip = "gui.broom-resources-tooltip",
+        key = "resources",
+        options = resource_options(),
+    },
     { caption = "gui.broom-nuclear",     tooltip = "gui.broom-nuclear-tooltip",     key = "nuclear" },
     { caption = "gui.broom-biter-creep", tooltip = "gui.broom-biter-creep-tooltip", key = "biter_creep" },
     {
@@ -74,8 +127,11 @@ for _, section in ipairs(SECTIONS) do
         CONTROL_BY_NAME[name] = { key = section.key }
     end
     for _, option in ipairs(section.options) do
-        option.name = CHECKBOX_PREFIX .. option.key .. (option.value and "_" .. option.value or "")
-        CONTROL_BY_NAME[option.name] = option
+        if not option.label then
+            local suffix = option.value and "_" .. option.value or option.exclude and "__" .. option.exclude or ""
+            option.name = CHECKBOX_PREFIX .. option.key .. suffix
+            CONTROL_BY_NAME[option.name] = option
+        end
     end
 end
 
@@ -87,6 +143,9 @@ local session_position_reset = {}
 --- @param control table
 --- @return boolean
 local function control_state(settings, control)
+    if control.exclude then
+        return settings[control.key][control.exclude] == true
+    end
     if control.value then
         return settings[control.key] == control.value
     end
@@ -133,9 +192,11 @@ local function refresh(frame, settings)
             end
             local container = section.has_options and section_frame[SECTION_OPTIONS_NAME] or section_frame
             for _, option in ipairs(section.options) do
-                local checkbox = container[option.name]
-                if checkbox and checkbox.valid then
-                    checkbox.state = control_state(settings, option)
+                if not option.label then
+                    local checkbox = container[option.name]
+                    if checkbox and checkbox.valid then
+                        checkbox.state = control_state(settings, option)
+                    end
                 end
             end
         end
@@ -292,15 +353,26 @@ local function build_frame(player)
     for _, section in ipairs(SECTIONS) do
         local container = add_section(scroll, section)
         for _, option in ipairs(section.options) do
-            local checkbox = container.add {
-                type = option.value and "radiobutton" or "checkbox",
-                name = option.name,
-                caption = { option.caption },
-                tooltip = { option.tooltip },
-                state = control_state(settings, option),
-            }
-            if option.indent then
-                checkbox.style.left_margin = 16
+            if option.label then
+                local label = container.add {
+                    type = "label",
+                    caption = { option.label },
+                    style = "semibold_label",
+                }
+                label.style.font_color = LABEL_COLOR
+                label.style.left_margin = 8
+            else
+                -- Dynamic options carry prebuilt localised strings; static ones carry locale keys
+                local checkbox = container.add {
+                    type = option.value and "radiobutton" or "checkbox",
+                    name = option.name,
+                    caption = type(option.caption) == "table" and option.caption or { option.caption },
+                    tooltip = type(option.tooltip) == "table" and option.tooltip or { option.tooltip },
+                    state = control_state(settings, option),
+                }
+                if option.indent then
+                    checkbox.style.left_margin = 16
+                end
             end
         end
     end
@@ -467,7 +539,11 @@ this.events = {
                 return
             end
             local settings = player_settings.get(event.player_index)
-            settings[control.key] = control.value or element.state
+            if control.exclude then
+                settings[control.key][control.exclude] = element.state or nil
+            else
+                settings[control.key] = control.value or element.state
+            end
             local player = game.get_player(event.player_index)
             local frame = player and get_frame(player)
             if frame then
