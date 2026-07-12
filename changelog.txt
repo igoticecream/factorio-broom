@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.1.1
+Date: 2026-07-12
+  Features:
+    - Added options to heal pollution-damaged trees instead of removing them, either everywhere or only where no pollution remains.
+---------------------------------------------------------------------------------------------------
 Version: 1.1.0
 Date: 2026-07-11
   Features:

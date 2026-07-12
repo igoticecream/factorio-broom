@@ -15,11 +15,20 @@ local LABEL_COLOR = { 200, 200, 200 }
 -- Every category is a section. Single settings render directly as checkboxes;
 -- multi-option sections are collapsible and use an action string for radios.
 local SECTIONS = {
-    { caption = "gui.broom-trees",       tooltip = "gui.broom-trees-tooltip",       key = "trees" },
+    {
+        caption = "gui.broom-trees",
+        tooltip = "gui.broom-trees-tooltip",
+        key = "trees",
+        options = {
+            { key = "trees_action", value = "remove",          indent = true, caption = "gui.broom-remove",               tooltip = "gui.broom-remove-trees-tooltip" },
+            { key = "trees_action", value = "heal",            indent = true, caption = "gui.broom-tree-heal",            tooltip = "gui.broom-tree-heal-tooltip" },
+            { key = "trees_action", value = "heal_unpolluted", indent = true, caption = "gui.broom-tree-heal-unpolluted", tooltip = "gui.broom-tree-heal-unpolluted-tooltip" },
+        },
+    },
     {
         caption = "gui.broom-rocks",
         tooltip = "gui.broom-rocks-tooltip",
-        enabled_key = "rocks",
+        key = "rocks",
         options = {
             { key = "rocks_action", value = "remove", indent = true, caption = "gui.broom-remove",    tooltip = "gui.broom-remove-rocks-tooltip" },
             { key = "rocks_action", value = "heal",   indent = true, caption = "gui.broom-rock-heal", tooltip = "gui.broom-rock-heal-tooltip" },
@@ -28,7 +37,7 @@ local SECTIONS = {
     {
         caption = "gui.broom-decoratives",
         tooltip = "gui.broom-decoratives-tooltip",
-        enabled_key = "decoratives",
+        key = "decoratives",
         options = {
             { key = "decoratives_action", value = "remove",     indent = true, caption = "gui.broom-remove",            tooltip = "gui.broom-remove-decoratives-tooltip" },
             { key = "decoratives_action", value = "artificial", indent = true, caption = "gui.broom-remove-artificial", tooltip = "gui.broom-remove-artificial-tooltip" },
@@ -42,7 +51,7 @@ local SECTIONS = {
     {
         caption = "gui.broom-corpses",
         tooltip = "gui.broom-corpses-tooltip",
-        enabled_key = "corpses",
+        key = "corpses",
         options = {
             { key = "corpses_exclude_biter",      indent = true, caption = "gui.broom-exclude-biter",      tooltip = "gui.broom-exclude-biter-tooltip" },
             { key = "corpses_exclude_scorchmark", indent = true, caption = "gui.broom-exclude-scorchmark", tooltip = "gui.broom-exclude-scorchmark-tooltip" },
@@ -57,11 +66,12 @@ local SECTIONS = {
 -- used by the event handlers.
 local CONTROL_BY_NAME = {}
 for _, section in ipairs(SECTIONS) do
-    section.name = "broom_" .. (section.key or section.enabled_key) .. "_frame"
+    section.name = "broom_" .. section.key .. "_frame"
+    section.has_options = section.options ~= nil
     section.options = section.options or { { key = section.key, caption = section.caption, tooltip = section.tooltip } }
-    if section.enabled_key then
-        local name = CHECKBOX_PREFIX .. section.enabled_key
-        CONTROL_BY_NAME[name] = { key = section.enabled_key }
+    if section.has_options then
+        local name = CHECKBOX_PREFIX .. section.key
+        CONTROL_BY_NAME[name] = { key = section.key }
     end
     for _, option in ipairs(section.options) do
         option.name = CHECKBOX_PREFIX .. option.key .. (option.value and "_" .. option.value or "")
@@ -114,14 +124,14 @@ local function refresh(frame, settings)
     for _, section in ipairs(SECTIONS) do
         local section_frame = scroll[section.name]
         if section_frame and section_frame.valid then
-            if section.enabled_key then
+            if section.has_options then
                 local header = section_frame[SECTION_HEADER_NAME]
-                local checkbox = header and header[CHECKBOX_PREFIX .. section.enabled_key]
+                local checkbox = header and header[CHECKBOX_PREFIX .. section.key]
                 if checkbox and checkbox.valid then
-                    checkbox.state = settings[section.enabled_key]
+                    checkbox.state = settings[section.key]
                 end
             end
-            local container = section.key and section_frame or section_frame[SECTION_OPTIONS_NAME]
+            local container = section.has_options and section_frame[SECTION_OPTIONS_NAME] or section_frame
             for _, option in ipairs(section.options) do
                 local checkbox = container[option.name]
                 if checkbox and checkbox.valid then
@@ -153,7 +163,7 @@ local function add_section(scroll, section_data)
     }
     section.style.horizontally_stretchable = true
 
-    if section_data.key then
+    if not section_data.has_options then
         return section
     end
 
@@ -167,7 +177,7 @@ local function add_section(scroll, section_data)
 
     header.add {
         type = "checkbox",
-        name = CHECKBOX_PREFIX .. section_data.enabled_key,
+        name = CHECKBOX_PREFIX .. section_data.key,
         caption = { section_data.caption },
         tooltip = { section_data.tooltip },
         state = false,

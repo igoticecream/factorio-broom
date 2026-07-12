@@ -1,5 +1,6 @@
 local DEFAULTS = {
     trees = false,
+    trees_action = "remove",
     rocks = false,
     rocks_action = "remove",
     cliffs = false,
