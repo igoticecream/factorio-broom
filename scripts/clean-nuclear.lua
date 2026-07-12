@@ -57,7 +57,7 @@ local function clean_nuclear(surface, area)
                 local hidden_tile = hidden_surface.get_tile(x, y)
                 local hidden_tile_name = hidden_tile.name
 
-                -- Replace water tiles wil landfill
+                -- Replace water tiles with landfill
                 if string.find(hidden_tile_name, "water") then
                     hidden_tile_name = "landfill"
                 end

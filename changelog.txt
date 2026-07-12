@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.1.3
+Date: 2026-07-12
+  Bugfixes:
+    - Fixed decoratives regeneration sometimes removing adjacent chunk decoratives at the border.
+---------------------------------------------------------------------------------------------------
 Version: 1.1.2
 Date: 2026-07-12
   Features:
