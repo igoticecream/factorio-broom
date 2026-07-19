@@ -19,6 +19,7 @@ Customize cleanup for each player in the settings window that opens with the bro
     - Biter creep
     - Decoratives (remove all, remove from artificial tiles only, or regenerate)
     - Corpses (biter corpses, explosion scorchmarks, tree stumps, building remnants)
+    - Entities in editor mode (flamethrower ground flames, living enemies, and unit spawners)
 
 ## Bonus
 Includes an option that prevents the aftermath of an atomic bomb (scorchmarks, nuclear tiles, etc.)

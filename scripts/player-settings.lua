@@ -14,6 +14,10 @@ local DEFAULTS = {
     corpses_exclude_scorchmark = false,
     corpses_exclude_stump = false,
     corpses_exclude_remnants = false,
+    entities = false,
+    entities_exclude_flames = false,
+    entities_exclude_enemies = false,
+    entities_exclude_spawners = false,
 }
 
 local function default_settings()

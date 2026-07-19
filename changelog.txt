@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.1.4
+Date: 2026-07-16
+  Features:
+    - Added editor-only cleanup options for flamethrower ground flames, living enemies, and unit spawners.
+---------------------------------------------------------------------------------------------------
 Version: 1.1.3
 Date: 2026-07-12
   Bugfixes:

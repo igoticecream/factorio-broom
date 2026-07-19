@@ -10,6 +10,7 @@ local cleaners = {
     require("scripts.clean-rocks"),
     require("scripts.clean-trees"),
     require("scripts.clean-cliffs"),
+    require("scripts.clean-entities"),
 }
 
 --- @param event EventData.on_player_selected_area|EventData.on_player_alt_selected_area
@@ -18,8 +19,12 @@ local function on_selected_area(event)
         return
     end
     local preferences = player_settings.get(event.player_index)
+    local player = game.get_player(event.player_index)
+    if not player then
+        return
+    end
     for _, clean in ipairs(cleaners) do
-        clean(event.surface, event.area, preferences)
+        clean(event.surface, event.area, preferences, player)
     end
 end
 

@@ -12,6 +12,12 @@ local SECTION_ARROW_NAME = "broom_section_arrow"
 local SECTION_OPTIONS_NAME = "broom_section_options"
 local LABEL_COLOR = { 200, 200, 200 }
 
+--- @param player LuaPlayer
+--- @return boolean
+local function is_editor(player)
+    return player.controller_type == defines.controllers.editor
+end
+
 --- @param prototype LuaEntityPrototype
 --- @return boolean
 local function is_fluid_resource(prototype)
@@ -112,6 +118,17 @@ local SECTIONS = {
             { key = "corpses_exclude_remnants",   indent = true, caption = "gui.broom-exclude-remnants",   tooltip = "gui.broom-exclude-remnants-tooltip" },
         },
     },
+    {
+        caption = "gui.broom-entities",
+        tooltip = "gui.broom-entities-tooltip",
+        key = "entities",
+        editor_only = true,
+        options = {
+            { key = "entities_exclude_flames",   indent = true, caption = "gui.broom-exclude-flames",   tooltip = "gui.broom-exclude-flames-tooltip" },
+            { key = "entities_exclude_enemies",  indent = true, caption = "gui.broom-exclude-enemies",  tooltip = "gui.broom-exclude-enemies-tooltip" },
+            { key = "entities_exclude_spawners", indent = true, caption = "gui.broom-exclude-spawners", tooltip = "gui.broom-exclude-spawners-tooltip" },
+        },
+    },
 }
 
 -- Expand the single-setting shorthand, derive each section's frame name from
@@ -173,6 +190,21 @@ end
 --- @return LuaGuiElement pin_button
 local function get_pin_button(frame)
     return frame.broom_titlebar[PIN_BUTTON_NAME]
+end
+
+--- Show editor-only sections only while the player is using the editor controller.
+--- @param frame LuaGuiElement
+--- @param player LuaPlayer
+local function refresh_editor_sections(frame, player)
+    local scroll = frame[INNER_FRAME_NAME][SCROLL_NAME]
+    for _, section in ipairs(SECTIONS) do
+        if section.editor_only then
+            local section_frame = scroll[section.name]
+            if section_frame and section_frame.valid then
+                section_frame.visible = is_editor(player)
+            end
+        end
+    end
 end
 
 --- Update every checkbox from the player's settings
@@ -352,6 +384,10 @@ local function build_frame(player)
 
     for _, section in ipairs(SECTIONS) do
         local container = add_section(scroll, section)
+        if section.editor_only then
+            local section_frame = container.parent
+            section_frame.visible = is_editor(player)
+        end
         for _, option in ipairs(section.options) do
             if option.label then
                 local label = container.add {
@@ -392,6 +428,7 @@ local function show(player)
         frame.location = { 0, 0 }
     end
     refresh(frame, player_settings.get(player.index))
+    refresh_editor_sections(frame, player)
     frame.visible = true
     frame.bring_to_front()
     if not is_pinned(player.index) then
@@ -496,6 +533,7 @@ this.events = {
             local frame = player and get_frame(player)
             if frame then
                 refresh(frame, player_settings.reset(event.player_index))
+                refresh_editor_sections(frame, player)
             end
         elseif element.name == PIN_BUTTON_NAME then
             local player = game.get_player(event.player_index)
@@ -548,6 +586,7 @@ this.events = {
             local frame = player and get_frame(player)
             if frame then
                 refresh(frame, settings)
+                refresh_editor_sections(frame, player)
             end
         end
     end,
@@ -579,6 +618,14 @@ this.events = {
         local frame = get_frame(player)
         if frame then
             frame.location = { 0, 0 }
+        end
+    end,
+
+    [defines.events.on_player_controller_changed] = function(event)
+        local player = game.get_player(event.player_index)
+        local frame = player and get_frame(player)
+        if frame then
+            refresh_editor_sections(frame, player)
         end
     end,
 
